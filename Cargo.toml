@@ -1,0 +1,20 @@
+[package]
+name = "async-priority-channel"
+description = "An async channel where pending messages are delivered in order of priority"
+version = "0.1.0"
+authors = ["Robert T. McGibbon <rmcgibbo@gmail.com>"]
+edition = "2018"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/rmcgibbo/async-priority-channel"
+homepage = "https://github.com/rmcgibbo/async-priority-channel"
+documentation = "https://docs.rs/async-priority-channel"
+keywords = ["mpmc", "mpsc", "spmc", "chan", "futures"]
+categories = ["asynchronous", "concurrency"]
+resolver = "2"
+
+[dependencies]
+event-listener = "^2"
+tokio = { version = "^1", features = ["sync", "rt-multi-thread", "macros", "time"] }
+
+[dev-dependencies]
+futures-lite = "*"
