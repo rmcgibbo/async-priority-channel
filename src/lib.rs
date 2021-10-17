@@ -34,7 +34,7 @@
 
 mod awaitable_atomics;
 
-use awaitable_atomics::{AwaitableAtomicBool, AwaitableAtomicCounter};
+use awaitable_atomics::AwaitableAtomicCounterAndBit;
 use std::{
     collections::BinaryHeap,
     error, fmt,
@@ -72,8 +72,7 @@ where
 
     let channel = Arc::new(PriorityQueueChannel {
         heap: Mutex::new(BinaryHeap::new()),
-        len: AwaitableAtomicCounter::new(0),
-        closed: AwaitableAtomicBool::new(false),
+        len_and_closed: AwaitableAtomicCounterAndBit::new(0),
         cap,
         sender_count: AtomicUsize::new(1),
         receiver_count: AtomicUsize::new(1),
@@ -116,14 +115,12 @@ where
     // the data that needs to be maintained under a mutex
     heap: Mutex<BinaryHeap<Item<I, P>>>,
 
-    // is the channel closed?
-    closed: AwaitableAtomicBool,
+    // number of items in the channel, and is the channel closed,
+    // all accessible without holding the mutex?
+    len_and_closed: AwaitableAtomicCounterAndBit,
 
     // capacity = 0 means unbounded, otherwise the bound.
     cap: usize,
-
-    // number of things in the heap, accessible without holding the mutex
-    len: AwaitableAtomicCounter,
 
     sender_count: AtomicUsize,
     receiver_count: AtomicUsize,
@@ -216,13 +213,13 @@ where
     /// Returns `true` if this call has closed the channel and it was not closed already.
     ///
     fn close(&self) -> bool {
-        let was_closed = self.closed.fetch_or(true);
+        let was_closed = self.len_and_closed.set_bit();
         !was_closed
     }
 
     // Return `true` if the channel is closed
     fn is_closed(&self) -> bool {
-        self.closed.load()
+        self.len_and_closed.load().0
     }
 
     /// Return `true` if the channel is empty
@@ -237,7 +234,7 @@ where
 
     /// Returns the number of messages in the channel.
     fn len(&self) -> usize {
-        self.len.load()
+        self.len_and_closed.load().1
     }
 }
 
@@ -273,7 +270,7 @@ where
                 match heap.len() < self.channel.cap {
                     true => {
                         heap.push(Item { msg, priority });
-                        self.channel.len.incr();
+                        self.channel.len_and_closed.incr();
                         Ok(())
                     }
                     false => Err(TrySendError::Full((msg, priority))),
@@ -292,8 +289,7 @@ where
         let mut msg2 = msg;
         let mut priority2 = priority;
         loop {
-            let decr_listener = self.channel.len.listen_decr();
-            let closed_listener = self.channel.closed.listen();
+            let decr_listener = self.channel.len_and_closed.listen_decr();
             match self.try_send(msg2, priority2) {
                 Ok(_) => {
                     return Ok(());
@@ -301,11 +297,7 @@ where
                 Err(TrySendError::Full((msg, priority))) => {
                     msg2 = msg;
                     priority2 = priority;
-
-                    tokio::select! {
-                    _ = closed_listener => { },
-                        _ = decr_listener => { }
-                    }
+                    decr_listener.await;
                 }
                 Err(TrySendError::Closed((msg, priority))) => {
                     return Err(SendError((msg, priority)));
@@ -383,7 +375,7 @@ where
                 let item = heap.pop();
                 match item {
                     Some(item) => {
-                        self.channel.len.decr();
+                        self.channel.len_and_closed.decr();
                         Ok((item.msg, item.priority))
                     }
                     None => Err(TryRecvError::Empty),
@@ -400,8 +392,7 @@ where
     /// no more messages.
     pub async fn recv(&self) -> Result<(I, P), RecvError> {
         loop {
-            let incr_listener = self.channel.len.listen_incr();
-            let closed_listener = self.channel.closed.listen();
+            let incr_listener = self.channel.len_and_closed.listen_incr();
             match self.try_recv() {
                 Ok(item) => {
                     return Ok(item);
@@ -410,10 +401,7 @@ where
                     return Err(RecvError);
                 }
                 Err(TryRecvError::Empty) => {
-                    tokio::select! {
-                        _ = closed_listener => {},
-                        _ = incr_listener => {}
-                    }
+                    incr_listener.await;
                 }
             }
         }
