@@ -219,3 +219,37 @@ async fn bclose_1() {
         thread.await.unwrap();
     }
 }
+
+#[test]
+fn sendv_1() {
+    let cap = 10;
+    let (tx, rx) = bounded::<&str, i32>(cap);
+    let v = vec![("a", 0), ("b", 1)];
+    tx.try_sendv(v.into_iter().peekable()).unwrap();
+    assert_eq!(rx.try_recv().unwrap(), ("b", 1));
+    assert_eq!(rx.try_recv().unwrap(), ("a", 0));
+
+    let n = 100;
+    let v = vec![("a", 0); n];
+    let err = tx.try_sendv(v.into_iter().peekable()).unwrap_err();
+    assert_eq!(err.into_inner().count(), n - cap);
+}
+
+#[test]
+fn sendv_2() {
+    let cap = 10;
+    let (tx, _rx) = bounded::<&str, i32>(cap);
+    tx.close();
+    assert!(tx.is_closed());
+    let err = tx
+        .try_sendv(vec![("a", 0), ("b", 1)].into_iter().peekable())
+        .unwrap_err();
+    assert_eq!(err.into_inner().count(), 2);
+}
+
+#[test]
+fn sendv_3() {
+    let (tx, _rx) = bounded::<(), i32>(2);
+    tx.try_send((), 0).unwrap();
+    tx.try_send((), 0).unwrap();
+}

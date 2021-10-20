@@ -38,6 +38,7 @@ use awaitable_atomics::AwaitableAtomicCounterAndBit;
 use std::{
     collections::BinaryHeap,
     error, fmt,
+    iter::Peekable,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
@@ -236,9 +237,13 @@ where
     fn len(&self) -> usize {
         self.len_and_closed.load().1
     }
+
+    fn len_and_closed(&self) -> (bool, usize) {
+        self.len_and_closed.load()
+    }
 }
 
-impl<I, P> Sender<I, P>
+impl<T, P> Sender<T, P>
 where
     P: Ord,
 {
@@ -246,17 +251,36 @@ where
     ///
     /// If the channel is full or closed, this method returns an error.
     ///
-    pub fn try_send(&self, msg: I, priority: P) -> Result<(), TrySendError<(I, P)>> {
-        if self.channel.is_closed() {
-            return Err(TrySendError::Closed((msg, priority)));
-        }
+    pub fn try_send(&self, msg: T, priority: P) -> Result<(), TrySendError<(T, P)>> {
+        self.try_sendv(std::iter::once((msg, priority)).peekable())
+            .map_err(|e| match e {
+                TrySendError::Closed(mut value) => TrySendError::Closed(value.next().expect("foo")),
+                TrySendError::Full(mut value) => TrySendError::Full(value.next().expect("foo")),
+            })
+    }
 
-        if self.channel.len() > self.channel.cap {
+    /// Attempts to send multiple messages into the channel.
+    ///
+    /// If the channel is closed, this method returns an error.
+    ///
+    /// If the channel is full or nearly full, this method inserts as many messages
+    /// as it can into the channel and then returns an error containing the
+    /// remaining unsent messages.
+    pub fn try_sendv<I>(&self, msgs: Peekable<I>) -> Result<(), TrySendError<Peekable<I>>>
+    where
+        I: Iterator<Item = (T, P)>,
+    {
+        let mut msgs = msgs;
+        let (is_closed, len) = self.channel.len_and_closed();
+        if is_closed {
+            return Err(TrySendError::Closed(msgs));
+        }
+        if len > self.channel.cap {
             panic!("size of channel is larger than capacity. this must indicate a bug");
         }
 
-        match self.channel.len() == self.channel.cap {
-            true => Err(TrySendError::Full((msg, priority))),
+        match len == self.channel.cap {
+            true => Err(TrySendError::Full(msgs)),
             false => {
                 // we're below capacity according to the atomic len() field.
                 // but it's possible that two threads will get here at the same time
@@ -267,14 +291,25 @@ where
                     .heap
                     .lock()
                     .expect("task panicked while holding lock");
-                match heap.len() < self.channel.cap {
-                    true => {
-                        heap.push(Item { msg, priority });
-                        self.channel.len_and_closed.incr();
-                        Ok(())
+                let mut n = 0;
+                loop {
+                    if heap.len() < self.channel.cap {
+                        if let Some((msg, priority)) = msgs.next() {
+                            heap.push(Item { msg, priority });
+                            n += 1;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        self.channel.len_and_closed.incr(n);
+                        return match msgs.peek() {
+                            Some(_) => Err(TrySendError::Full(msgs)),
+                            None => Ok(()),
+                        };
                     }
-                    false => Err(TrySendError::Full((msg, priority))),
                 }
+                self.channel.len_and_closed.incr(n);
+                Ok(())
             }
         }
     }
@@ -285,7 +320,7 @@ where
     ///
     /// If the channel is closed, this method returns an error.
     ///
-    pub async fn send(&self, msg: I, priority: P) -> Result<(), SendError<(I, P)>> {
+    pub async fn send(&self, msg: T, priority: P) -> Result<(), SendError<(T, P)>> {
         let mut msg2 = msg;
         let mut priority2 = priority;
         loop {
@@ -301,6 +336,33 @@ where
                 }
                 Err(TrySendError::Closed((msg, priority))) => {
                     return Err(SendError((msg, priority)));
+                }
+            }
+        }
+    }
+
+    /// Send multiple messages into the channel
+    ///
+    /// If the channel is full, this method waits until there is space.
+    ///
+    /// If the channel is closed, this method returns an error.
+    pub async fn sendv<I>(&self, msgs: Peekable<I>) -> Result<(), SendError<Peekable<I>>>
+    where
+        I: Iterator<Item = (T, P)>,
+    {
+        let mut msgs2 = msgs;
+        loop {
+            let decr_listener = self.channel.len_and_closed.listen_decr();
+            match self.try_sendv(msgs2) {
+                Ok(_) => {
+                    return Ok(());
+                }
+                Err(TrySendError::Full(msgs)) => {
+                    msgs2 = msgs;
+                    decr_listener.await;
+                }
+                Err(TrySendError::Closed(msgs)) => {
+                    return Err(SendError(msgs));
                 }
             }
         }

@@ -29,8 +29,8 @@ impl AwaitableAtomicCounterAndBit {
         prior & USIZE_TOP_BIT_MASK > 0
     }
 
-    pub fn incr(&self) -> (bool, usize) {
-        let prior = self.value.fetch_add(1, Ordering::SeqCst);
+    pub fn incr(&self, n: usize) -> (bool, usize) {
+        let prior = self.value.fetch_add(n, Ordering::SeqCst);
         if prior & !USIZE_TOP_BIT_MASK >= (1 << 63) - 1 {
             panic!("Cannot increase size past 2**63-1");
         }
