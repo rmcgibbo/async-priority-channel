@@ -17,5 +17,5 @@ readme = "README.md"
 event-listener = "^2"
 
 [dev-dependencies]
-futures-lite = "*"
+futures-lite = "^1"
 tokio = { version = "^1", features = ["sync", "rt-multi-thread", "macros", "time"] }
