@@ -11,6 +11,7 @@ documentation = "https://docs.rs/async-priority-channel"
 keywords = ["mpmc", "mpsc", "spmc", "chan", "futures"]
 categories = ["asynchronous", "concurrency"]
 resolver = "2"
+readme = "README.md"
 
 [dependencies]
 event-listener = "^2"
