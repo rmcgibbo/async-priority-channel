@@ -1,5 +1,14 @@
 # async-priority-channel
 
+[![Build](https://github.com/rmcgibbo/async-priority-channel/workflows/Build%20and%20test/badge.svg)](
+https://github.com/rmcgibbo/async-priority-channel/actions)
+[![License](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](
+https://github.com/rmcgibbo/async-priority-channel/)
+[![Cargo](https://img.shields.io/crates/v/async-priority-channel.svg)](
+https://crates.io/crates/async-priority-channel)
+[![Documentation](https://docs.rs/async-priority-channel/badge.svg)](
+https://docs.rs/async-priority-channel)
+
 An async channel where pending messages are delivered in order of priority.
 
 There are two kinds of channels:
