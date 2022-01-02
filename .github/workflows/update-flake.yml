@@ -18,7 +18,7 @@ jobs:
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v3
-	env:
+        env:
           # See https://github.com/peter-evans/create-pull-request/issues/48#issuecomment-536204092
           GITHUB_TOKEN: ${{ secrets.REPO_SCOPED_TOKEN }}
         with:
