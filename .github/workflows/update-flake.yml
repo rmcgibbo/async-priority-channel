@@ -1,0 +1,38 @@
+name: "Update dependencies"
+on:
+  repository_dispatch:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # runs weekly on Sunday at 00:00
+
+jobs:
+  createPullRequest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v16
+      - name: Make changes to pull request
+        run: |
+          nix flake update
+          nix shell nixpkgs#cargo -c cargo update
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@v3
+	env:
+          # See https://github.com/peter-evans/create-pull-request/issues/48#issuecomment-536204092
+          GITHUB_TOKEN: ${{ secrets.REPO_SCOPED_TOKEN }}
+        with:
+          commit-message: Update flakes
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          signoff: false
+          branch: flake-updates
+          delete-branch: true
+          title: 'Upgrade Cargo.lock, flake.lock'
+          body: |
+            Update report
+            - Updated with *today's* date
+      - name: Check outputs
+        run: |
+          echo "Pull Request Number - ${{ steps.cpr.outputs.pull-request-number }}"
+          echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"
