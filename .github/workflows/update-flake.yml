@@ -21,7 +21,6 @@ jobs:
         env:
           # See https://github.com/peter-evans/create-pull-request/issues/48#issuecomment-536204092
           token: ${{ secrets.REPO_SCOPED_TOKEN }}
-        with:
           commit-message: Update flakes
           committer: GitHub <noreply@github.com>
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
