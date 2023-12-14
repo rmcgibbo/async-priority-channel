@@ -37,6 +37,7 @@ mod awaitable_atomics;
 use awaitable_atomics::AwaitableAtomicCounterAndBit;
 use std::{
     collections::BinaryHeap,
+    convert::TryInto,
     error, fmt,
     iter::Peekable,
     sync::{
@@ -63,7 +64,7 @@ use std::{
 /// assert_eq!(r.recv().await, Ok(("Foo", 0)));
 /// # });
 /// ```
-pub fn bounded<I, P>(cap: usize) -> (Sender<I, P>, Receiver<I, P>)
+pub fn bounded<I, P>(cap: u64) -> (Sender<I, P>, Receiver<I, P>)
 where
     P: Ord,
 {
@@ -105,7 +106,7 @@ pub fn unbounded<I, P>() -> (Sender<I, P>, Receiver<I, P>)
 where
     P: Ord,
 {
-    bounded(usize::MAX)
+    bounded(u64::MAX)
 }
 
 #[derive(Debug)]
@@ -121,7 +122,7 @@ where
     len_and_closed: AwaitableAtomicCounterAndBit,
 
     // capacity = 0 means unbounded, otherwise the bound.
-    cap: usize,
+    cap: u64,
 
     sender_count: AtomicUsize,
     receiver_count: AtomicUsize,
@@ -234,11 +235,11 @@ where
     }
 
     /// Returns the number of messages in the channel.
-    fn len(&self) -> usize {
+    fn len(&self) -> u64 {
         self.len_and_closed.load().1
     }
 
-    fn len_and_closed(&self) -> (bool, usize) {
+    fn len_and_closed(&self) -> (bool, u64) {
         self.len_and_closed.load()
     }
 }
@@ -293,7 +294,7 @@ where
                     .expect("task panicked while holding lock");
                 let mut n = 0;
                 loop {
-                    if heap.len() < self.channel.cap {
+                    if heap.len().try_into().unwrap_or(u64::MAX) < self.channel.cap {
                         if let Some((msg, priority)) = msgs.next() {
                             heap.push(Item { msg, priority });
                             n += 1;
@@ -392,14 +393,14 @@ where
     }
 
     /// Returns the number of messages in the channel.
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> u64 {
         self.channel.len()
     }
 
     /// Returns the channel capacity if it's bounded.
-    pub fn capacity(&self) -> Option<usize> {
+    pub fn capacity(&self) -> Option<u64> {
         match self.channel.cap {
-            usize::MAX => None,
+            u64::MAX => None,
             c => Some(c),
         }
     }
@@ -493,14 +494,14 @@ where
     }
 
     /// Returns the number of messages in the channel.
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> u64 {
         self.channel.len()
     }
 
     /// Returns the channel capacity if it's bounded.
-    pub fn capacity(&self) -> Option<usize> {
+    pub fn capacity(&self) -> Option<u64> {
         match self.channel.cap {
-            usize::MAX => None,
+            u64::MAX => None,
             c => Some(c),
         }
     }

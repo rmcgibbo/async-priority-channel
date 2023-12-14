@@ -1,52 +1,52 @@
 use event_listener::{Event, EventListener};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 
-const USIZE_TOP_BIT_MASK: usize = 0x1000000000000000;
+const U64_TOP_BIT_MASK: u64 = 0x1000000000000000;
 
 #[derive(Debug)]
 pub struct AwaitableAtomicCounterAndBit {
     incr_event: Event,
     decr_event: Event,
-    value: AtomicUsize,
+    value: AtomicU64,
 }
 
 impl AwaitableAtomicCounterAndBit {
-    pub fn new(value: usize) -> Self {
-        if value & USIZE_TOP_BIT_MASK > 0 {
+    pub fn new(value: u64) -> Self {
+        if value & U64_TOP_BIT_MASK > 0 {
             panic!("Initial value cannot be larger than 2**63");
         }
         Self {
             incr_event: Event::new(),
             decr_event: Event::new(),
-            value: AtomicUsize::new(value),
+            value: AtomicU64::new(value),
         }
     }
 
     pub fn set_bit(&self) -> bool {
-        let prior = self.value.fetch_or(USIZE_TOP_BIT_MASK, Ordering::SeqCst);
+        let prior = self.value.fetch_or(U64_TOP_BIT_MASK, Ordering::SeqCst);
         self.incr_event.notify(usize::MAX);
         self.decr_event.notify(usize::MAX);
-        prior & USIZE_TOP_BIT_MASK > 0
+        prior & U64_TOP_BIT_MASK > 0
     }
 
-    pub fn incr(&self, n: usize) -> (bool, usize) {
+    pub fn incr(&self, n: u64) -> (bool, u64) {
         let prior = self.value.fetch_add(n, Ordering::SeqCst);
-        if prior & !USIZE_TOP_BIT_MASK >= (1 << 63) - 1 {
+        if prior & !U64_TOP_BIT_MASK >= (1 << 63) - 1 {
             panic!("Cannot increase size past 2**63-1");
         }
         self.incr_event.notify(usize::MAX);
-        (prior & USIZE_TOP_BIT_MASK > 0, prior & !USIZE_TOP_BIT_MASK)
+        (prior & U64_TOP_BIT_MASK > 0, prior & !U64_TOP_BIT_MASK)
     }
 
-    pub fn decr(&self) -> (bool, usize) {
+    pub fn decr(&self) -> (bool, u64) {
         let prior = self.value.fetch_sub(1, Ordering::SeqCst);
         self.decr_event.notify(usize::MAX);
-        (prior & USIZE_TOP_BIT_MASK > 0, prior & !USIZE_TOP_BIT_MASK)
+        (prior & U64_TOP_BIT_MASK > 0, prior & !U64_TOP_BIT_MASK)
     }
 
-    pub fn load(&self) -> (bool, usize) {
+    pub fn load(&self) -> (bool, u64) {
         let value = self.value.load(Ordering::SeqCst);
-        (value & USIZE_TOP_BIT_MASK > 0, value & !USIZE_TOP_BIT_MASK)
+        (value & U64_TOP_BIT_MASK > 0, value & !U64_TOP_BIT_MASK)
     }
 
     pub fn listen_incr(&self) -> EventListener {

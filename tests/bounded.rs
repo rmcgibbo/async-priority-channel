@@ -230,9 +230,9 @@ fn sendv_1() {
     assert_eq!(rx.try_recv().unwrap(), ("a", 0));
 
     let n = 100;
-    let v = vec![("a", 0); n];
+    let v = vec![("a", 0); n as usize];
     let err = tx.try_sendv(v.into_iter().peekable()).unwrap_err();
-    assert_eq!(err.into_inner().count(), n - cap);
+    assert_eq!(err.into_inner().count() as u64, n - cap);
 }
 
 #[test]

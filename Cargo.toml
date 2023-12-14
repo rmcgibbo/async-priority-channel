@@ -1,7 +1,7 @@
 [package]
 name = "async-priority-channel"
 description = "An async channel where pending messages are delivered in order of priority"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Robert T. McGibbon <rmcgibbo@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0 OR MIT"
