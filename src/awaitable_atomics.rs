@@ -1,5 +1,8 @@
 use event_listener::{Event, EventListener};
-use std::{sync::atomic::{AtomicU64, Ordering}, pin::Pin};
+use std::{
+    pin::Pin,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 const U64_TOP_BIT_MASK: u64 = 0x1000000000000000;
 
