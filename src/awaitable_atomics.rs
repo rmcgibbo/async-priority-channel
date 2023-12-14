@@ -1,5 +1,5 @@
 use event_listener::{Event, EventListener};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{sync::atomic::{AtomicU64, Ordering}, pin::Pin};
 
 const U64_TOP_BIT_MASK: u64 = 0x1000000000000000;
 
@@ -49,10 +49,10 @@ impl AwaitableAtomicCounterAndBit {
         (value & U64_TOP_BIT_MASK > 0, value & !U64_TOP_BIT_MASK)
     }
 
-    pub fn listen_incr(&self) -> EventListener {
+    pub fn listen_incr(&self) -> Pin<Box<EventListener>> {
         self.incr_event.listen()
     }
-    pub fn listen_decr(&self) -> EventListener {
+    pub fn listen_decr(&self) -> Pin<Box<EventListener>> {
         self.decr_event.listen()
     }
 }

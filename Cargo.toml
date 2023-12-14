@@ -14,8 +14,8 @@ resolver = "2"
 readme = "README.md"
 
 [dependencies]
-event-listener = "^2"
+event-listener = "4.0.0"
 
 [dev-dependencies]
-futures-lite = "^1"
-tokio = { version = "^1", features = ["sync", "rt-multi-thread", "macros", "time"] }
+futures-lite = "2.1.0"
+tokio = { version = "1.35.0", features = ["sync", "rt-multi-thread", "macros", "time"] }
