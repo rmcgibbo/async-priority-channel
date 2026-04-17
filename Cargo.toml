@@ -14,7 +14,7 @@ resolver = "3"
 readme = "README.md"
 
 [dependencies]
-event-listener = "4.0.0"
+event-listener = "5.3.0"
 
 [dev-dependencies]
 futures-lite = "2.1.0"
