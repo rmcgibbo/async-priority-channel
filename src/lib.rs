@@ -41,8 +41,8 @@ use std::{
     error, fmt,
     iter::Peekable,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
